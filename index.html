@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eyni Qovluqdan Flipbook</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip/dist/css/page-flip.min.css">
+    <style>
+        .homepage__container { max-width: 1680px; margin: 0 auto; padding: 20px; }
+        .flipbook-wrapper { width: 100%; max-width: 1680px; box-sizing: border-box; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 0 auto; }
+        .flipbook-stage { width: 100%; display: flex; justify-content: center; align-items: center; }
+        .flipbook-container { margin: 0 auto; }
+        .flipbook-container .page-block { background: #fff; overflow: hidden; box-sizing: border-box; }
+        .flipbook-container canvas { display: block; }
+        .flipbook-controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; width: fit-content; max-width: 100%; padding: 7px 10px; background: #fff; border: 1px solid #e5eaf1; border-radius: 10px; box-shadow: 0 3px 12px #1522380d; }
+        .flipbook-btn { border: 0; border-radius: 7px; padding: 8px 13px; background: #075985; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s; }
+        .flipbook-btn:hover { background: #0c4a6e; }
+        .flipbook-btn:focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
+        .flipbook-btn.secondary { background: #e8eef5; color: #263746; }
+        .flipbook-btn.secondary:hover { background: #d8e2ed; }
+        .page-number { min-width: 58px; text-align: center; color: #334155; font-size: 13px; font-weight: 600; }
+        .loading-spinner { padding: 24px 12px; color: #475569; font-size: 14px; text-align: center; }
+        
+        .flipbook-wrapper:fullscreen { max-width: none; width: 100%; height: 100%; margin: 0; padding: 6px; border-radius: 0; background: #111827; justify-content: center; gap: 8px; overflow: hidden; }
+        .flipbook-wrapper:fullscreen .flipbook-stage { flex: 1; min-height: 0; overflow: hidden; }
+        .flipbook-wrapper:fullscreen .flipbook-controls { flex-shrink: 0; }
+        .flipbook-wrapper:fullscreen .page-number { color: #e2e8f0; }
+        .flipbook-wrapper:fullscreen .loading-spinner { color: #e2e8f0; }
+        
+        @media(max-width: 600px) {
+            .flipbook-wrapper { margin: 10px auto 16px; padding: 8px; border-radius: 9px; gap: 9px; }
+            .flipbook-controls { gap: 5px; padding: 6px; }
+            .flipbook-btn { padding: 7px 9px; font-size: 12px; }
+            .page-number { min-width: 48px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="homepage__container">
+        <!-- Başlıq hissəsi -->
+        <section class="info-bar py-3 bg-light border-bottom mb-4">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <h1 class="sehife-bas fs-3">Nəşrlər / Jurnal - Flipbook</h1>
+                </div>
+            </div>
+        </section>
+
+        <!-- Əsas kontent -->
+        <section class="container-fluid top-mg my-4">
+            <div class="row">
+                <div class="col-12 teref-col">
+                    <div class="chartdiv metni">
+                        
+                        <div class="flipbook-wrapper" id="flipbookWrapper">
+                            <div id="loading" class="loading-spinner">Kitab qovluqdan yüklənir, lütfən gözləyin...</div>
+                            <div class="flipbook-stage" id="flipStage"></div>
+                            <div class="flipbook-controls" id="controls" hidden>
+                                <button type="button" class="flipbook-btn" id="btn-prev">‹ Əvvəlki</button>
+                                <span class="page-number" id="page-info">1 / --</span>
+                                <button type="button" class="flipbook-btn" id="btn-next">Növbəti ›</button>
+                                <button type="button" class="flipbook-btn secondary" id="btn-fullscreen">⛶ Tam ekran</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- JavaScript Kitabxanaları -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
+    <script>
+    (() => {
+        // PDF faylı ilə HTML faylı eyni qovluqdadırsa, sadəcə adını yazmaq kifayətdir:
+        const pdfUrl = 'owjba0kzku8wkgggws.pdf';
+
+        const NORMAL_MAX_W = 800; 
+        const FS_FACTOR = 1.05;    
+
+        const stage = document.getElementById("flipStage");
+        const loading = document.getElementById("loading");
+        const controls = document.getElementById("controls");
+        const pageInfo = document.getElementById("page-info");
+        const wrapper = document.getElementById("flipbookWrapper");
+        const prev = document.getElementById("btn-prev");
+        const next = document.getElementById("btn-next");
+        const fullscreenBtn = document.getElementById("btn-fullscreen");
+
+        let pageFlip = null, numPages = 0, ratio = 1.414, pages = [], currentIndex = 0, resizeTimer, buildId = 0;
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+
+        const isFs = () => document.fullscreenElement || document.webkitFullscreenElement;
+
+        function calcSize() {
+            let w, single;
+            if (isFs()) {
+                const aw = stage.clientWidth, ah = stage.clientHeight;
+                single = aw < 700 || aw < ah;
+                w = Math.min(single ? aw : aw / 2, (ah * FS_FACTOR) / ratio);
+            } else {
+                const aw = wrapper.clientWidth - 28;
+                single = aw < 700;
+                w = Math.min(single ? aw : aw / 2, NORMAL_MAX_W);
+            }
+            w = Math.floor(Math.max(240, w));
+            return {w: w, h: Math.floor(w * ratio), single: single};
+        }
+
+        async function buildBook() {
+            if (!pages.length) return;
+            const myId = ++buildId;
+
+            if (pageFlip) {
+                try { currentIndex = pageFlip.getCurrentPageIndex(); } catch (e) {}
+                try { pageFlip.destroy(); } catch (e) {}
+                pageFlip = null;
+            }
+
+            const s = calcSize();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            stage.innerHTML = "";
+            loading.hidden = false;
+
+            const blocks = [];
+            for (let i = 0; i < pages.length; i++) {
+                if (myId !== buildId) return; 
+                loading.textContent = "Səhifələr hazırlanır: " + (i + 1) + " / " + pages.length;
+                const page = pages[i];
+                const base = page.getViewport({scale: 1});
+                const viewport = page.getViewport({scale: (s.w * dpr) / base.width});
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d", {alpha: false});
+                canvas.width = Math.round(viewport.width);
+                canvas.height = Math.round(viewport.height);
+                canvas.style.width = s.w + "px";
+                canvas.style.height = s.h + "px";
+                await page.render({canvasContext: ctx, viewport: viewport}).promise;
+
+                const block = document.createElement("div");
+                block.className = "page-block";
+                block.style.width = s.w + "px";
+                block.style.height = s.h + "px";
+                block.appendChild(canvas);
+                blocks.push(block);
+            }
+            if (myId !== buildId) return;
+
+            const container = document.createElement("div");
+            container.className = "flipbook-container";
+            container.style.width = (s.single ? s.w : s.w * 2) + "px";
+            stage.appendChild(container);
+            blocks.forEach(b => container.appendChild(b));
+
+            pageFlip = new St.PageFlip(container, {
+                width: s.w,
+                height: s.h,
+                size: "fixed",
+                minWidth: s.w,
+                maxWidth: s.w,
+                minHeight: s.h,
+                maxHeight: s.h,
+                drawShadow: true,
+                showCover: true,
+                usePortrait: true,
+                maxShadowOpacity: 0.25,
+                flippingTime: 500
+            });
+            pageFlip.loadFromHTML(container.querySelectorAll(".page-block"));
+            if (currentIndex > 0) pageFlip.turnToPage(currentIndex);
+            pageInfo.textContent = (currentIndex + 1) + " / " + numPages;
+            pageFlip.on("flip", e => {
+                currentIndex = e.data;
+                pageInfo.textContent = (e.data + 1) + " / " + numPages;
+            });
+
+            loading.hidden = true;
+            controls.hidden = false;
+        }
+
+        async function init() {
+            try {
+                const pdf = await pdfjsLib.getDocument({
+                    url: pdfUrl,
+                    cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/cmaps/",
+                    cMapPacked: true,
+                    standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/standard_fonts/"
+                }).promise;
+                numPages = pdf.numPages;
+                for (let i = 1; i <= numPages; i++) pages.push(await pdf.getPage(i));
+                const b = pages[0].getViewport({scale: 1});
+                ratio = b.height / b.width;
+                await buildBook();
+            } catch (error) {
+                console.error(error);
+                loading.hidden = false;
+                loading.textContent = "PDF faylını oxumaq mümkün olmadı. Fayl adını və ya lokal serverdə açıldığını yoxlayın.";
+            }
+        }
+
+        prev.addEventListener("click", () => pageFlip && pageFlip.flipPrev());
+        next.addEventListener("click", () => pageFlip && pageFlip.flipNext());
+
+        fullscreenBtn.addEventListener("click", async () => {
+            if (!isFs()) {
+                if (wrapper.requestFullscreen) await wrapper.requestFullscreen();
+                else if (wrapper.webkitRequestFullscreen) wrapper.webkitRequestFullscreen();
+            } else if (document.exitFullscreen) {
+                await document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+        });
+
+        const rebuildLater = () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(buildBook, 250); };
+        document.addEventListener("fullscreenchange", rebuildLater);
+        document.addEventListener("webkitfullscreenchange", rebuildLater);
+        window.addEventListener("resize", rebuildLater);
+
+        init();
+    })();
+    </script>
+</body>
+</html>
