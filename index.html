@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nəşr</title>
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip/dist/css/page-flip.min.css">
     <style>
@@ -72,16 +71,14 @@
         </section>
     </div>
 
-    <!-- JavaScript Kitabxanaları -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
     <script>
     (() => {
-        // PDF faylı ilə HTML faylı eyni qovluqdadırsa, sadəcə adını yazmaq kifayətdir:
         const pdfUrl = 'owjba0kzku8wkgggws.pdf';
 
         const NORMAL_MAX_W = 800; 
-        const FS_FACTOR = 1.05;    
+        const FS_FACTOR = 0.85;    
 
         const stage = document.getElementById("flipStage");
         const loading = document.getElementById("loading");
